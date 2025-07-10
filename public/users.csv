@@ -1,0 +1,4 @@
+username,password,knowledge_id,name,age,course,class_rank,gpa,new_knowledge_id
+alice,pass123,975c3d2a13614122a09faee42e984c81,Alice Thompson,19,B.Sc. Computer Science,1,9.8,975c3d2a13614122a09faee42e984c81
+john,pass123,788cb14d88ed436ca64c11705622d1dd,John Patel,20,BBA,22,7.2,788cb14d88ed436ca64c11705622d1dd
+nova,pass123,7fa9eb9d2a1746be988162de3310bc72,Nova Fernandes,19,B.A. Mass Communication,18,7.5,7fa9eb9d2a1746be988162de3310bc72

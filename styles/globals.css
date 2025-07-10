@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+li {
+  list-style-type: square;
+  margin-left: 30px;
+  padding: 2px;
+}
+
+@keyframes fade-in-out {
+  0%, 100% { opacity: 0.25; }   /* barely visible */
+  50%       { opacity: 1; }      /* fully visible  */
+}
+
+.fade-loader-text {
+  animation: fade-in-out 1.4s ease-in-out infinite;
+}
+
