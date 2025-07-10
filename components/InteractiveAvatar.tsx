@@ -5,6 +5,7 @@ import StreamingAvatar, {
   TaskMode,
   TaskType,
   VoiceEmotion,
+  STTProvider,     
 } from "@heygen/streaming-avatar";
 import {
   Button,
@@ -27,7 +28,23 @@ import { AVATARS, STT_LANGUAGE_LIST } from "@/app/lib/constants";
 import { toast } from "react-toastify";
 import { ScaleLoader } from "react-spinners";   // new ⬅️
 
-export default function InteractiveAvatar() {
+import { FC } from "react";
+
+export interface InteractiveAvatarProps {
+  /** PhonicFlow (HeyGen) avatar ID returned by the API */
+  defaultAvatar?: string;
+  /** Knowledge–base ID that should be loaded by default */
+  defaultKnowledge?: string;
+  /** Hide the avatar / knowledge selectors when true */
+  hideSelectors?: boolean;
+}
+
+const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
+  defaultAvatar,
+  defaultKnowledge,
+  hideSelectors = false,
+  
+}) => {
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [isLoadingRepeat, setIsLoadingRepeat] = useState(false);
   const [stream, setStream] = useState<MediaStream>();
@@ -238,7 +255,7 @@ export default function InteractiveAvatar() {
           emotion: voiceEmotion,
         },
         sttSettings: {
-          provider: "deepgram",
+          provider: STTProvider.DEEPGRAM,
           confidence: 0.1,
         },
         language: language,
@@ -249,7 +266,7 @@ export default function InteractiveAvatar() {
       await avatar.current?.startVoiceChat({
         useSilencePrompt: false,
         isInputAudioMuted: false,
-      });
+      } as any);
       setChatMode("voice_mode");
       appendLog("Session started successfully");
     } catch (error) {
@@ -556,3 +573,5 @@ export default function InteractiveAvatar() {
     </div>
   );
 }
+
+export default InteractiveAvatar

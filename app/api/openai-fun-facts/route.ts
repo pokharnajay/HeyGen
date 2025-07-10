@@ -1,16 +1,20 @@
-import OpenAI from "openai";
-import { NextResponse } from "next/server";
+// /app/api/openai-fun-facts/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import OpenAI from 'openai';
 
-export async function POST(request) {
-  console.log("Received POST request to /api/openai-fun-facts");
+export async function POST(request: NextRequest) {
+  console.log('Received POST request to /api/openai-fun-facts');
+
   const { course, age } = await request.json();
-
   if (!course || !age) {
-    return NextResponse.json({ error: "Course and age are required" }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Course and age are required' },
+      { status: 400 }
+    );
   }
 
   const openai = new OpenAI({
-    apiKey: process.env.NEXT_PUBLIC_OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY, // keep server-side
   });
 
   try {
@@ -54,12 +58,13 @@ export async function POST(request) {
     }
 
     return NextResponse.json({ facts });
-  } catch (error) {
-    console.error("OpenAI API error:", error);
-    return NextResponse.json({ error: error.message || "Failed to fetch fun facts" }, { status: 500 });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message ?? 'Failed to fetch fun facts' },
+      { status: 500 }
+    );
   }
 }
 
-export async function GET() {
-  return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
-}
+export const GET = () =>
+  NextResponse.json({ error: 'Method not allowed' }, { status: 405 });

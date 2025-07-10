@@ -38,7 +38,7 @@ export default function App() {
       </header>
       <main className="flex-1 flex flex-col items-center justify-center p-6">
         <div className="w-full h-full max-h-[80vh] bg-white rounded-lg shadow-lg p-6">
-          <InteractiveAvatar knowledgeId={user.knowledgeId} />
+          <InteractiveAvatar/>
         </div>
       </main>
     </div>
