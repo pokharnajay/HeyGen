@@ -10,13 +10,20 @@ export async function POST(req: NextRequest) {
 
   const kbText = knowledgeId ? await getKnowledgeText(knowledgeId) : "";
 
+  // Create messages array with explicit role types
+  const messages: OpenAI.ChatCompletionMessageParam[] = [
+    { role: "system", content: `You are a helpful tutor. Use the knowledge below when relevant. Keep answers under ${wordLimit} words.` },
+  ];
+
+  if (kbText) {
+    messages.push({ role: "system", content: `### KNOWLEDGE BASE ###\n${kbText}` });
+  }
+
+  messages.push({ role: "user", content: prompt });
+
   const chat = await openai.chat.completions.create({
     model,
-    messages: [
-      { role: "system", content: `You are a helpful tutor. Use the knowledge below when relevant. Keep answers under ${wordLimit} words.` },
-      ...(kbText ? [{ role:"system", content: `### KNOWLEDGE BASE ###\n${kbText}` }] : []),
-      { role: "user", content: prompt }
-    ],
+    messages,
     temperature: 0.7,
   });
 
