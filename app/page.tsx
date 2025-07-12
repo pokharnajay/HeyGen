@@ -27,7 +27,7 @@ export default function App() {
 
   return (
     <div className="w-screen h-screen flex flex-col bg-gradient-to-br from-indigo-100 to-indigo-300">
-      <header className="flex justify-between items-center p-4 bg-gradient-to-r from-indigo-500 to-indigo-300 text-white">
+      <header className="flex justify-between items-center p-3 bg-gradient-to-r from-indigo-500 to-indigo-300 text-white">
         <h1 className="text-xl font-semibold">Welcome, {user.username}</h1>
         <Button
           className="bg-white text-indigo-500 font-semibold"

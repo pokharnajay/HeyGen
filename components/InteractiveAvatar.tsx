@@ -5,7 +5,7 @@ import StreamingAvatar, {
   TaskMode,
   TaskType,
   VoiceEmotion,
-  STTProvider,     
+  STTProvider,
 } from "@heygen/streaming-avatar";
 import {
   Button,
@@ -27,7 +27,7 @@ import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 import { AVATARS, STT_LANGUAGE_LIST } from "@/app/lib/constants";
 import { toast } from "react-toastify";
 import { ScaleLoader } from "react-spinners";   // new ⬅️
-
+import Webcam from "react-webcam";
 import { FC } from "react";
 
 export interface InteractiveAvatarProps {
@@ -43,7 +43,7 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
   defaultAvatar,
   defaultKnowledge,
   hideSelectors = false,
-  
+
 }) => {
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [isLoadingRepeat, setIsLoadingRepeat] = useState(false);
@@ -54,8 +54,9 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
   const [language, setLanguage] = useState<string>("en");
   const [data, setData] = useState<StartAvatarResponse>();
   const [text, setText] = useState<string>("");
-  const [chatMode, setChatMode] = useState("text_mode");
+  const [chatMode, setChatMode] = useState("voice_mode");
   const [isUserTalking, setIsUserTalking] = useState(false);
+  const [isLogsOpen, setIsLogsOpen] = useState(true);   // ← NEW
   const [studentData, setStudentData] = useState<{
     name: string;
     age: number | string;
@@ -396,181 +397,208 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
     }
   };
 
+  const webcamRef = useRef<HTMLVideoElement>(null);
+  const [webcamStream, setWebcamStream] = useState<MediaStream>();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        setWebcamStream(stream);
+      } catch (err) {
+        console.error("Webcam access denied:", err);
+        appendLog("Webcam access denied");
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (webcamStream && webcamRef.current) {
+      webcamRef.current.srcObject = webcamStream;
+      webcamRef.current.onloadedmetadata = () => webcamRef.current!.play();
+    }
+  }, [webcamStream]);
+
+
+  const videoConstraints = {
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    facingMode: "user",          // front camera on phones
+  };
+
+
   return (
-    <div className="w-full h-full max-h-full flex gap-4">
-      <div className="flex flex-col flex-1">
-        {(
-          <>
-            <div className="w-full max-w-[900px] mb-4 p-4 bg-[#19181A] rounded-lg text-[rgb(255 255 255)]">
-              <h3 className="text-lg font-bold">Student Information</h3>
-              <p><strong>Name:</strong> {studentData.name}</p>
-              <p><strong>Age:</strong> {studentData.age}</p>
-              <p><strong>Course:</strong> {studentData.course}</p>
-            </div>
-            <Card className="w-full max-w-[900px] h-full bg-[#19181A] text-[rgb(255 255 255)]">
-              <CardBody className="overflow-y-scroll">
-                <h3 className="text-lg font-bold mb-2">Fun Facts</h3>
-                {isLoadingFacts ? (
-                  <Spinner color="default" size="sm" />
-                ) : factsError ? (
-                  <p className="text-red-400">{factsError}</p>
-                ) : funFacts.length === 0 ? (
-                  <p>Loading fun facts for you.</p>
-                ) : (
-                  <ul className="flex flex-col gap-2 w-full list-none">
-                    {funFacts.map((fact, index) => (
-                      <div key={index} className="text-sm ">
-                        <Chip
-                          variant="flat"
-                          className="bg-gradient-to-tr from-[#] to-indigo-300 text-white h-auto w-full rounded-md"
-                          classNames={{
-                            content: "whitespace-normal break-words text-left text-sm leading-normal py-2",
-                          }}
-                        >
-                          {fact}
-                        </Chip>
-                      </div>
-                    ))}
-                  </ul>
-                )}
-              </CardBody>
-            </Card>
-          </>
-        )}
-      </div>
-      <Card className="w-[60%]">
-        <CardBody className="h-[500px] w-full flex flex-col justify-center items-center">
-          {stream ? (
-            <div className="h-full w-full justify-center items-center flex rounded-lg overflow-hidden relative">
-              <video
-                ref={mediaStream}
-                autoPlay
-                playsInline
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                }}
-              >
-                <track kind="captions" />
-              </video>
-              {avatarSpeech && (
-                <div className="absolute bottom-5 left-5 bg-black bg-opacity-50 text-white p-2 rounded">
-                  {avatarSpeech}
+    <>
+      <div className={`w-full h-full max-h-full flex relative ${isLogsOpen ? "gap-4" : "gap-0"}`}>
+        <Card className="w-full flex flex-col relative">
+          <CardBody className="h-[500px] w-full flex flex-col">
+            {/* ─────────── VIDEO GRID ─────────── */}
+            {stream ? (
+              <>
+                {/* VIDEO GRID */}
+                <div className="grid grid-cols-2 gap-4 flex-1">
+                  {/* Avatar feed wrapper */}
+                  <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+                    <video
+                      ref={mediaStream}
+                      autoPlay
+                      playsInline
+                      className="absolute inset-0 w-full h-full object-contain"
+                    />
+                  </div>
+
+                  {/* Webcam feed wrapper */}
+                  <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+                    <Webcam
+                      audio={false}
+                      mirrored
+                      videoConstraints={{
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: "user",
+                        aspectRatio: 16 / 9,               // ask the camera for 16 : 9 too
+                      }}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  </div>
                 </div>
-              )}
-              <div className="flex flex-col gap-2 absolute bottom-3 right-7">
-                <Button
-                  className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white rounded-lg"
-                  size="md"
-                  variant="shadow"
-                  onClick={handleInterrupt}
-                >
-                  Interrupt task
-                </Button>
-                <Button
-                  className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white rounded-lg"
-                  size="md"
-                  variant="shadow"
-                  onClick={endSession}
-                >
-                  End session
-                </Button>
-              </div>
-              <div className="absolute top-3 left-7">
-                <Card className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white p-2">
-                  <CardBody className="p-1">
-                    <Chip
-                      variant="flat"
-                      className="bg-white text-indigo-600 font-semibold"
+
+
+                {/* ─────────── CONTROL BAR ─────────── */}
+                <div className="flex items-center justify-between mt-4">
+                  <Chip
+                    variant="flat"
+                    className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white font-semibold"
+                  >
+                    Session&nbsp;{formatSessionDuration()}
+                  </Chip>
+
+                  <div className="flex gap-2">
+                    <Button
+                      className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white"
+                      size="md"
+                      variant="shadow"
+                      onClick={handleInterrupt}
                     >
-                      Session: {formatSessionDuration()}
-                    </Chip>
-                  </CardBody>
-                </Card>
+                      Interrupt task
+                    </Button>
+                    <Button
+                      className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white"
+                      size="md"
+                      variant="shadow"
+                      onClick={endSession}
+                    >
+                      End session
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : !isLoadingSession ? (
+              /* START-SESSION placeholder (unchanged) */
+              <div className="h-full w-full flex flex-col items-center justify-center gap-8">
+                <Button
+                  className="bg-gradient-to-tr from-indigo-500 to-indigo-300 w-[30%] text-white"
+                  size="md"
+                  variant="shadow"
+                  onClick={startSession}
+                >
+                  Start session
+                </Button>
               </div>
-            </div>
-          ) : !isLoadingSession ? (
-            <div className="h-full w-full justify-center items-center flex flex-col gap-8 self-center">
-              <div className="flex flex-col gap-2 w-full"></div>
-              <Button
-                className="bg-gradient-to-tr from-indigo-500 to-indigo-300 w-[30%] text-white"
-                size="md"
-                variant="shadow"
-                onClick={startSession}
-              >
-                Start session
-              </Button>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center gap-3">
-              <ScaleLoader color="#6366F1" height={35} width={4} radius={2} speedMultiplier={1.2} />  {/* ✅ new loader */}
-              <p className="fade-loader-text text-xl font-bold mt-2 text-gray-300">
-                Loading your personalised agent&hellip;
-              </p>
-            </div>
-          )}
-        </CardBody>
-        <Divider />
-        <CardFooter className="flex flex-col gap-3 relative">
-          <Tabs
-            aria-label="Options"
-            selectedKey={chatMode}
-            onSelectionChange={(v) => {
-              handleChangeChatMode(v);
-            }}
-          >
-            <Tab key="text_mode" title="Text mode" />
-            <Tab key="voice_mode" title="Voice mode" />
-          </Tabs>
-          {chatMode === "text_mode" ? (
-            <div className="w-full flex relative">
-              <InteractiveAvatarTextInput
-                disabled={!stream}
-                input={text}
-                label="Chat"
-                loading={isLoadingRepeat}
-                placeholder="Type something for the avatar to respond"
-                setInput={setText}
-                onSubmit={handleSpeak}
-              />
-              {text && (
-                <Chip className="absolute right-16 top-3">Listening</Chip>
-              )}
-            </div>
-          ) : (
-            <div className="w-full text-center">
-              <Button
-                isDisabled={!isUserTalking}
-                className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white"
-                size="md"
-                variant="shadow"
-              >
-                {isUserTalking ? "Listening" : "Voice chat"}
-              </Button>
-            </div>
-          )}
-        </CardFooter>
-      </Card>
-      <div className="flex flex-col flex-1">
-        <Card className="max-h-full h-full">
-          <CardBody className="overflow-y-scroll">
-            <h3 className="text-lg font-bold mb-2">Logs</h3>
-            {logs.length === 0 ? (
-              <p>No logs available</p>
             ) : (
-              <ul className="flex flex-col gap-1 text-white overflow-y-scroll">
-                {logs.map((log, index) => (
-                  <li key={index} className="text-sm text-white">
-                    {log}
-                  </li>
-                ))}
-              </ul>
+              /* LOADER (unchanged) */
+              <div className="flex flex-col items-center gap-3 mt-10">
+                <ScaleLoader color="#6366F1" height={35} width={4} radius={2} />
+                <p className="text-xl font-bold mt-2 text-gray-300">
+                  Loading your personalised agent&hellip;
+                </p>
+              </div>
             )}
           </CardBody>
+
+
+
+
+          <div className="flex flex-1 max-h-[36%] min-h-[36%] h-[36%] gap-2 px-2">
+            {(
+              <>
+                <Card className="w-full max-w-[350px] mb-4 p-4 bg-[#19181A] rounded-lg text-[rgb(255 255 255)]">
+                  <h3 className="text-lg font-bold">Student Information</h3>
+                  <p><strong>Name:</strong> {studentData.name}</p>
+                  <p><strong>Age:</strong> {studentData.age}</p>
+                  <p><strong>Course:</strong> {studentData.course}</p>
+                </Card>
+                <Card className="w-full mb-4 p-4 bg-[#19181A] rounded-lg text-[rgb(255 255 255)]">
+                  <h3 className="text-lg font-bold mb-2">Fun Facts</h3>
+                  <CardBody className="overflow-y-scroll">
+                    {isLoadingFacts ? (
+                      <Spinner color="default" size="sm" />
+                    ) : factsError ? (
+                      <p className="text-red-400">{factsError}</p>
+                    ) : funFacts.length === 0 ? (
+                      <p>Loading fun facts for you...</p>
+                    ) : (
+                      <ul className="flex flex-col gap-2 w-full list-none">
+                        {funFacts.map((fact, index) => (
+                          <div key={index} className="text-sm ">
+                            <Chip
+                              variant="flat"
+                              className="bg-gradient-to-tr from-[#] to-indigo-300 text-white h-auto w-full rounded-md"
+                              classNames={{
+                                content: "whitespace-normal break-words text-left text-sm leading-normal py-2",
+                              }}
+                            >
+                              {fact}
+                            </Chip>
+                          </div>
+                        ))}
+                      </ul>
+                    )}
+                  </CardBody>
+                </Card>
+              </>
+            )}
+          </div>
+
+
+
+
+
         </Card>
+
+        {/* 3  Slide-out panel – same flex sibling, but width animates */}
+        <div
+          className={`transition-all duration-300 overflow-hidden
+                ${isLogsOpen ? "w-[25%] max-w-[350px]" : "w-0"}`}
+        >
+          <Card className="h-full">
+            <CardBody className="overflow-y-scroll">
+              <h3 className="text-lg font-bold mb-2">Logs</h3>
+              {logs.length === 0 ? (
+                <p>No logs available</p>
+              ) : (
+                <ul className="flex flex-col gap-1 text-white">
+                  {logs.map((l, i) => (
+                    <li key={i} className="text-sm">{l}</li>
+                  ))}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+
+
+
       </div>
-    </div>
+      {/* <button
+        onClick={() => setIsLogsOpen(!isLogsOpen)}
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-10
+               bg-indigo-500 hover:bg-indigo-600 text-white
+               rounded-l-lg px-2 py-1 focus:outline-none"
+      >
+        <span className="rotate-[270deg]">{isLogsOpen ? "Hide Logs" : "Show Logs"}</span>
+      </button> */}
+    </>
   );
 }
 
