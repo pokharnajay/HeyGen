@@ -5,7 +5,7 @@ import StreamingAvatar, {
   TaskMode,
   TaskType,
   VoiceEmotion,
-  STTProvider,     
+  STTProvider,
 } from "@heygen/streaming-avatar";
 import {
   Button,
@@ -27,7 +27,7 @@ import InteractiveAvatarTextInput from "./InteractiveAvatarTextInput";
 import { AVATARS, STT_LANGUAGE_LIST } from "@/app/lib/constants";
 import { toast } from "react-toastify";
 import { ScaleLoader } from "react-spinners";   // new ⬅️
-
+import Webcam from "react-webcam";
 import { FC } from "react";
 
 export interface InteractiveAvatarProps {
@@ -43,7 +43,7 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
   defaultAvatar,
   defaultKnowledge,
   hideSelectors = false,
-  
+
 }) => {
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [isLoadingRepeat, setIsLoadingRepeat] = useState(false);
@@ -77,9 +77,6 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
   );
   const [taskType, setTaskType] = useState<TaskType>(TaskType.REPEAT);
   const [avatarSpeech, setAvatarSpeech] = useState<string>("");
-  const [funFacts, setFunFacts] = useState<string[]>([]);
-  const [isLoadingFacts, setIsLoadingFacts] = useState(false);
-  const [factsError, setFactsError] = useState<string>("");
 
   const mediaStream = useRef<HTMLVideoElement>(null);
   const avatar = useRef<StreamingAvatar | null>(null);
@@ -97,44 +94,7 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
     return username["username"];
   }
 
-  async function fetchFunFacts(course: string, age: string) {
-    if (!course || !age) {
-      setFactsError("Course or age is missing");
-      appendLog("Fun facts fetch skipped: missing course or age");
-      return;
-    }
-    setIsLoadingFacts(true);
-    setFactsError("");
-    appendLog(`Fetching fun facts, specially for you.`);
-    try {
-      const response = await fetch("/api/openai-fun-facts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ course, age }),
-      });
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Server error: ${response.status} - ${errorText}`);
-      }
-      const data = await response.json();
-      if (!data.facts || !Array.isArray(data.facts)) {
-        throw new Error("Invalid facts format received");
-      }
-      setFunFacts(data.facts);
-      if (data.facts.length === 0) {
-        setFactsError("No fun facts returned from OpenAI");
-        appendLog("No fun facts returned from OpenAI");
-      }
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      console.error("Fun facts fetch error:", error);
-      appendLog(`Fun facts fetch error: ${errorMsg}`);
-      setFactsError(errorMsg);
-      toast.error(`Failed to fetch fun facts: ${errorMsg}`);
-    } finally {
-      setIsLoadingFacts(false);
-    }
-  }
+  
 
   useEffect(() => {
     const username = getLoggedInUsername();
@@ -157,7 +117,6 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
             knowledge_id: studentInfo.new_knowledge_id,
           });
           appendLog(`Loaded data for user: ${username}, Knowledge ID: ${studentInfo.knowledge_id}`);
-          await fetchFunFacts(studentInfo.course, String(studentInfo.age));
         } else {
           const errorData = await response.json();
           setDebug(errorData.error || `User ${username} not found in database`);
@@ -268,6 +227,13 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
         isInputAudioMuted: false,
       } as any);
       setChatMode("voice_mode");
+
+      await avatar.current?.speak({
+        text: "Hi there, how can I help you today?",
+        taskType: TaskType.TALK,          // TALK works in voice-chat; REPEAT is fine in text-mode
+        taskMode: TaskMode.SYNC           // wait until the line finishes
+      });
+
       appendLog("Session started successfully");
     } catch (error) {
       console.error("Error starting avatar session:", error);
@@ -396,64 +362,48 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
     }
   };
 
+
+  const webcamRef = useRef<HTMLVideoElement>(null);
+  const [webcamStream, setWebcamStream] = useState<MediaStream>();
+  useEffect(() => {
+    if (webcamStream && webcamRef.current) {
+      webcamRef.current.srcObject = webcamStream;
+      webcamRef.current.onloadedmetadata = () => webcamRef.current!.play();
+    }
+  }, [webcamStream]);
+
   return (
-    <div className="w-full h-full max-h-full flex gap-4">
-      <div className="flex flex-col flex-1">
-        {(
-          <>
-            <div className="w-full max-w-[900px] mb-4 p-4 bg-[#19181A] rounded-lg text-[rgb(255 255 255)]">
-              <h3 className="text-lg font-bold">Student Information</h3>
-              <p><strong>Name:</strong> {studentData.name}</p>
-              <p><strong>Age:</strong> {studentData.age}</p>
-              <p><strong>Course:</strong> {studentData.course}</p>
-            </div>
-            <Card className="w-full max-w-[900px] h-full bg-[#19181A] text-[rgb(255 255 255)]">
-              <CardBody className="overflow-y-scroll">
-                <h3 className="text-lg font-bold mb-2">Fun Facts</h3>
-                {isLoadingFacts ? (
-                  <Spinner color="default" size="sm" />
-                ) : factsError ? (
-                  <p className="text-red-400">{factsError}</p>
-                ) : funFacts.length === 0 ? (
-                  <p>Loading fun facts for you.</p>
-                ) : (
-                  <ul className="flex flex-col gap-2 w-full list-none">
-                    {funFacts.map((fact, index) => (
-                      <div key={index} className="text-sm ">
-                        <Chip
-                          variant="flat"
-                          className="bg-gradient-to-tr from-[#] to-indigo-300 text-white h-auto w-full rounded-md"
-                          classNames={{
-                            content: "whitespace-normal break-words text-left text-sm leading-normal py-2",
-                          }}
-                        >
-                          {fact}
-                        </Chip>
-                      </div>
-                    ))}
-                  </ul>
-                )}
-              </CardBody>
-            </Card>
-          </>
-        )}
-      </div>
-      <Card className="w-[60%]">
-        <CardBody className="h-[500px] w-full flex flex-col justify-center items-center">
+    <div className="w-full h-full max-h-full rounded-2xl">
+      <Card className="w-[100%] h-full rounded-2xl">
+        <CardBody className="h-[100%] w-full flex flex-col justify-center items-center">
           {stream ? (
             <div className="h-full w-full justify-center items-center flex rounded-lg overflow-hidden relative">
-              <video
-                ref={mediaStream}
-                autoPlay
-                playsInline
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "contain",
-                }}
-              >
-                <track kind="captions" />
-              </video>
+              <div className="grid grid-cols-2 gap-4 flex-1">
+                {/* Avatar feed wrapper */}
+                <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+                  <video
+                    ref={mediaStream}
+                    autoPlay
+                    playsInline
+                    className="absolute inset-0 w-full h-full object-contain"
+                  />
+                </div>
+
+                {/* Webcam feed wrapper */}
+                <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+                  <Webcam
+                    audio={false}
+                    mirrored
+                    videoConstraints={{
+                      width: { ideal: 1280 },
+                      height: { ideal: 720 },
+                      facingMode: "user",
+                      aspectRatio: 16 / 9,               // ask the camera for 16 : 9 too
+                    }}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                </div>
+              </div>
               {avatarSpeech && (
                 <div className="absolute bottom-5 left-5 bg-black bg-opacity-50 text-white p-2 rounded">
                   {avatarSpeech}
@@ -511,8 +461,9 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
             </div>
           )}
         </CardBody>
+        
         <Divider />
-        <CardFooter className="flex flex-col gap-3 relative">
+        <CardFooter className="flex flex-col gap-3 h-[25%] relative">
           <Tabs
             aria-label="Options"
             selectedKey={chatMode}
@@ -524,7 +475,7 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
             <Tab key="voice_mode" title="Voice mode" />
           </Tabs>
           {chatMode === "text_mode" ? (
-            <div className="w-full flex relative">
+            <div className="w-full h-fit flex relative">
               <InteractiveAvatarTextInput
                 disabled={!stream}
                 input={text}
@@ -539,7 +490,7 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
               )}
             </div>
           ) : (
-            <div className="w-full text-center">
+            <div className="w-full text-center h-fit">
               <Button
                 isDisabled={!isUserTalking}
                 className="bg-gradient-to-tr from-indigo-500 to-indigo-300 text-white"
@@ -552,24 +503,6 @@ const InteractiveAvatar: FC<InteractiveAvatarProps> = ({
           )}
         </CardFooter>
       </Card>
-      <div className="flex flex-col flex-1">
-        <Card className="max-h-full h-full">
-          <CardBody className="overflow-y-scroll">
-            <h3 className="text-lg font-bold mb-2">Logs</h3>
-            {logs.length === 0 ? (
-              <p>No logs available</p>
-            ) : (
-              <ul className="flex flex-col gap-1 text-white overflow-y-scroll">
-                {logs.map((log, index) => (
-                  <li key={index} className="text-sm text-white">
-                    {log}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardBody>
-        </Card>
-      </div>
     </div>
   );
 }
